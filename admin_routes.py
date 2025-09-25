@@ -34,7 +34,6 @@ def screening_csv_upload():
         reader = csv.DictReader(stream)
         new_stocks = []
         for row in reader:
-            # Basic fields: symbol, name, sector, price, etc.
             stock = {
                 'symbol': row.get('symbol', '').upper(),
                 'name': row.get('name', ''),
@@ -48,6 +47,30 @@ def screening_csv_upload():
         # Store in-memory for demo (replace with DB in production)
         global SCREENING_STOCKS
         SCREENING_STOCKS = new_stocks
+
+        # Also create a StockScreening record for this upload
+
+        try:
+            StockScreening = models.StockScreening
+            User = models.User
+            admin_user = User.query.filter_by(is_admin=True).first()
+            if not admin_user:
+                print("[ERROR] No admin user found in database. Cannot create StockScreening with correct created_by.")
+            else:
+                print(f"[DEBUG] Found admin user: {admin_user.id} {admin_user.email}")
+            screening = StockScreening(
+                name=f"CSV Upload {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                criteria={},
+                results={'stocks': new_stocks},
+                created_by=admin_user.id if admin_user else '1'
+            )
+            screening.save()
+            print(f"[DEBUG] Created StockScreening: {screening.id}, name={screening.name}, count={len(new_stocks)}")
+        except Exception as e:
+            # Log but don't block CSV upload if screening creation fails
+            import sys
+            print(f"[ERROR] Could not create StockScreening: {e}", file=sys.stderr)
+
         return jsonify({'success': True, 'count': len(new_stocks)})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -298,11 +321,29 @@ def get_stock_screening(screening_id):
     screening = StockScreening.get(screening_id)
     if not screening:
         return jsonify({'success': False, 'error': 'Screening not found'}), 404
+
+    # Enrich each stock with historical price data for charting
+    results_data = screening.results_data.copy() if isinstance(screening.results_data, dict) else {}
+    stocks = results_data.get('stocks', [])
+    if stocks:
+        try:
+            from financial_data_service import FinancialDataService
+            fds = FinancialDataService()
+            for stock in stocks:
+                symbol = stock.get('symbol')
+                if symbol:
+                    stock_data = fds.get_stock_data(symbol, period='6mo')
+                    # Attach historical data for charting
+                    stock['historical_data'] = stock_data.get('historical_data', [])
+        except Exception as e:
+            import sys
+            print(f"[ERROR] Could not enrich stocks with historical data: {e}", file=sys.stderr)
+
     return jsonify({'success': True, 'screening': {
         'id': screening.id,
         'name': screening.name,
         'criteria_data': screening.criteria_data,
-        'results_data': screening.results_data,
+        'results_data': results_data,
         'created_at': screening.created_at.isoformat() + 'Z'
     }})
 
@@ -719,6 +760,26 @@ def bulk_upload_stocks():
         # Update mock screening results (if any)
         for screening in MOCK_SCREENINGS:
             screening['results_data'] = {'stocks': new_stocks}
+        # Also create a StockScreening record for this upload
+        try:
+            StockScreening = models.StockScreening
+            admin_user = User.query.filter_by(is_admin=True).first()
+            if not admin_user:
+                print("[ERROR] No admin user found in database. Cannot create StockScreening with correct created_by.")
+            else:
+                print(f"[DEBUG] Found admin user: {admin_user.id} {admin_user.email}")
+            screening = StockScreening(
+                name=f"Bulk Upload {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                criteria={},
+                results={'stocks': new_stocks},
+                created_by=admin_user.id if admin_user else '1'
+            )
+            screening.save()
+            print(f"[DEBUG] Created StockScreening: {screening.id}, name={screening.name}, count={len(new_stocks)}")
+        except Exception as e:
+            import sys
+            print(f"[ERROR] Could not create StockScreening: {e}", file=sys.stderr)
+
         # Prepare response
         response_data = {
             'success': True,

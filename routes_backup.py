@@ -433,8 +433,25 @@ def add_stock_to_user_watchlist(watchlist_id):
     if watchlist.user_id != current_user.id:
         return jsonify({'error': 'Unauthorized'}), 403
     
-    # Get stock data
-    stock_data = MarketDataService.get_stock_data(symbol.upper())
+    # Try to get real stock data using FinancialDataService (yfinance)
+    try:
+        from financial_data_service import FinancialDataService
+        fds = FinancialDataService()
+        stock_data = fds.get_stock_data(symbol.upper())
+        # Map to expected keys for watchlist
+        stock_data = {
+            'symbol': stock_data.get('symbol'),
+            'company_name': stock_data.get('name', stock_data.get('symbol')),
+            'sector': stock_data.get('sector', 'Unknown'),
+            'price': stock_data.get('price', 0),
+            'change_percent': stock_data.get('change_percent', 0),
+            'volume': stock_data.get('volume', 0),
+            'market_cap_category': stock_data.get('market_cap', 'Unknown'),
+            'country': 'USA'
+        }
+    except Exception as e:
+        # Fallback to mock data
+        stock_data = MarketDataService.get_stock_data(symbol.upper())
     if not stock_data:
         return jsonify({'error': f'Could not find data for {symbol}'}), 400
     

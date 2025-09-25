@@ -6,11 +6,5 @@ import AdminDashboard from './components/admin/AdminDashboard';
 const container = document.getElementById('admin-dashboard');
 if (container) {
     const root = createRoot(container);
-    const initialData = window.adminData || {
-        stats: {},
-        screenings: [],
-        user: {}
-    };
-    
-    root.render(<AdminDashboard initialData={initialData} />);
+    root.render(<AdminDashboard />);
 }
