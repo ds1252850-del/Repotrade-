@@ -2,15 +2,12 @@ import os
 import logging
 from flask import Flask
 from flask_login import LoginManager
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import DeclarativeBase
+from db import db
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 
-class Base(DeclarativeBase):
-    pass
 
 # Create Flask app
 app = Flask(__name__)
@@ -24,8 +21,6 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
     "pool_pre_ping": True,
 }
 
-# Initialize SQLAlchemy
-db = SQLAlchemy(model_class=Base)
 db.init_app(app)
 
 # Configure Flask-Login

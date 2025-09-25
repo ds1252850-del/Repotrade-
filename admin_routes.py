@@ -4,7 +4,8 @@ import datetime
 import csv
 import io
 import models
-from app import db
+from db import db
+StockScreening = models.StockScreening
 User = models.User
 Watchlist = models.Watchlist
 import json
@@ -63,7 +64,6 @@ import datetime
 import csv
 import io
 import models
-from app import db
 User = models.User
 Watchlist = models.Watchlist
 import json
@@ -92,7 +92,6 @@ def test_all_users():
         })
     return jsonify({'success': True, 'users': result})
 
-# TEMPORARY: Public test endpoint to verify Entry Zone and Breakout watchlists data
 @admin_bp.route('/admin/api/test-all-watchlists', methods=['GET'])
 def test_all_watchlists():
     all_watchlists = Watchlist.query.all()
@@ -280,7 +279,7 @@ def create_stock_screening():
 def list_stock_screenings():
     if not require_admin_session():
         return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-    screenings = StockScreening.get_all()
+    screenings = StockScreening.query.order_by(StockScreening.created_at.desc()).all()
     return jsonify({'success': True, 'screenings': [
         {
             'id': s.id,
